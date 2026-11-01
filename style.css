@@ -39,7 +39,6 @@
 
 * { box-sizing: border-box; }
 html, body { height: 100%; margin: 0; }
-body { position: relative; height: var(--vv-height, 100%); }
 body {
   background: var(--bg);
   color: var(--text);
@@ -75,11 +74,8 @@ input[type=password], input[type=search], input[type=text] {
 }
 
 .screen {
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: 0;
-  height: var(--vv-height, 100%);
+  position: fixed;
+  inset: 0;
   display: flex;
   flex-direction: column;
   padding: env(safe-area-inset-top) env(safe-area-inset-right) 0 env(safe-area-inset-left);
@@ -171,8 +167,8 @@ input[type=password], input[type=search], input[type=text] {
   pointer-events: none;
   color: var(--text);
 }
-.edit-wrap:not(.on) .hl { display: none; }
-.edit-wrap.on #editor { color: transparent; -webkit-text-fill-color: transparent; caret-color: var(--text); }
+.edit-wrap:not(.on) .hl, .edit-wrap.typing .hl { display: none; }
+.edit-wrap.on:not(.typing) #editor { color: transparent; -webkit-text-fill-color: transparent; caret-color: var(--text); }
 .ios .hl { padding-left: 19px; padding-right: 19px; }
 .md-h { color: var(--md-accent); font-weight: 700; }
 .md-b { font-weight: 700; }

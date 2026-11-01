@@ -477,17 +477,11 @@ if (/iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'Mac
   document.documentElement.classList.add('ios');
 }
 
-// iPhone: když vyjede klávesnice, Safari posouvá celou stránku a kurzor se pak kreslí jinde než text.
-// Proto má aplikace přesně výšku viditelné části (nad klávesnicí) a stránka se nesmí posunout.
-// (Žádné position: fixed – v něm Safari kreslí kurzor po posunu na špatném místě.)
-if (window.visualViewport) {
-  const fit = () => {
-    document.documentElement.style.setProperty('--vv-height', visualViewport.height + 'px');
-    if (window.scrollY || visualViewport.offsetTop) window.scrollTo(0, 0);
-  };
-  visualViewport.addEventListener('resize', fit);
-  visualViewport.addEventListener('scroll', fit);
-  fit();
+// iPhone: s vysunutou klávesnicí Safari posouvá pole a obarvenou kopii různě, takže kurzor ujede od textu.
+// Proto se tam při psaní ukazuje obyčejné pole (bez barev); barvy se vrátí po zavření klávesnice.
+if (document.documentElement.classList.contains('ios')) {
+  editor.addEventListener('focus', () => $('edit-wrap').classList.add('typing'));
+  editor.addEventListener('blur', () => { $('edit-wrap').classList.remove('typing'); renderHighlight(); });
 }
 
 for (const b of document.querySelectorAll('#modes button')) {
