@@ -31,6 +31,13 @@ const state = {
   saving: false,
 };
 
+// Jednorázový úklid: moje_poznamky.txt se už nepoužívá (uloženo v telefonech z dřívějška).
+if (state.pins && !store.get('cleanup1')) {
+  state.pins = state.pins.filter((p) => !(p.repo.endsWith('/sekretarka') && p.path === 'agenda/moje_poznamky.txt'));
+  store.set('pins', state.pins);
+  store.set('cleanup1', true);
+}
+
 const editor = $('editor');
 const preview = $('preview');
 
@@ -492,7 +499,15 @@ async function openPin(pin) {
     if (!(await leaveFile())) return;
     if (!(await openRepo(pin.repo))) return;
   }
-  if (!state.files.includes(pin.path)) { setStatus(`Soubor ${pin.path} v repozitáři ${pin.repo} už není`); return; }
+  if (!state.files.includes(pin.path)) {
+    setStatus(`Soubor ${pin.path} v repozitáři ${pin.repo} už není`);
+    if (confirm(`Soubor ${pin.path.split('/').pop()} už neexistuje. Odebrat ho z rychlých odkazů?`)) {
+      state.pins = state.pins.filter((p) => !samePin(p, pin));
+      store.set('pins', state.pins);
+      renderPins();
+    }
+    return;
+  }
   await openFile(pin.path);
 }
 
