@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Šuplík">
+<meta name="theme-color" content="#f6f6f4" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#1c1c1e" media="(prefers-color-scheme: dark)">
+<meta http-equiv="Content-Security-Policy"
+      content="default-src 'self'; connect-src https://api.github.com; img-src 'self' data: https:; style-src 'self'; script-src 'self'">
+<title>Šuplík</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- Přihlášení -->
+<section id="login" class="screen" hidden>
+  <div class="card">
+    <img src="icon-180.png" alt="" class="logo">
+    <h1>Šuplík</h1>
+    <p>Aby Šuplík mohl číst a ukládat tvoje soubory na GitHubu, potřebuje přístupový klíč.</p>
+    <ol>
+      <li>Otevři <a href="https://github.com/settings/tokens/new?scopes=repo&description=%C5%A0upl%C3%ADk%20iPhone" target="_blank" rel="noopener">vytvoření klíče na GitHubu</a> (přihlas se, pokud je potřeba).</li>
+      <li>U „Expiration“ zvol, jak dlouho má klíč platit (např. „No expiration“).</li>
+      <li>Zaškrtnuté „repo“ nech, sjeď dolů a klikni na „Generate token“.</li>
+      <li>Klíč (začíná <code>ghp_</code>) zkopíruj a vlož sem.</li>
+    </ol>
+    <form id="login-form">
+      <input id="token" type="password" placeholder="ghp_…" autocomplete="off" autocapitalize="off" spellcheck="false">
+      <button type="submit" class="primary">Přihlásit</button>
+    </form>
+    <p class="hint">Klíč zůstane uložený jen v tomto telefonu.</p>
+    <p id="login-error" class="error"></p>
+  </div>
+</section>
+
+<!-- Výběr repozitáře -->
+<section id="repos" class="screen" hidden>
+  <header class="bar">
+    <button id="repos-back" class="plain">Zpět</button>
+    <h2>Vyber repozitář</h2>
+    <span></span>
+  </header>
+  <input id="repo-search" type="search" placeholder="Hledat…">
+  <ul id="repo-list" class="list"></ul>
+</section>
+
+<!-- Hlavní okno -->
+<section id="main" class="screen" hidden>
+  <header class="bar">
+    <button id="menu-btn" class="icon" aria-label="Soubory">☰</button>
+    <div class="title">
+      <div id="file-title">Šuplík</div>
+      <div id="repo-title" class="sub"></div>
+    </div>
+    <button id="pin-btn" class="icon" aria-label="Připnout">☆</button>
+    <button id="save-btn" class="primary small" disabled>Uložit</button>
+  </header>
+  <nav id="pins" class="pins"></nav>
+  <div id="modes" class="modes" hidden>
+    <button data-mode="edit">Upravit</button>
+    <button data-mode="split" class="wide-only">Vedle sebe</button>
+    <button data-mode="preview">Náhled</button>
+  </div>
+  <div id="toolbar" class="toolbar" hidden></div>
+  <div id="work" class="work">
+    <textarea id="editor" spellcheck="true" autocapitalize="sentences"></textarea>
+    <article id="preview" class="markdown"></article>
+    <div id="empty" class="empty">Vyber soubor v menu ☰ nebo v rychlých odkazech nahoře.</div>
+  </div>
+  <footer id="status" class="status"></footer>
+</section>
+
+<!-- Boční menu se soubory -->
+<div id="drawer" class="drawer" hidden>
+  <div class="drawer-panel">
+    <header class="bar">
+      <h2 id="drawer-repo">Soubory</h2>
+      <button id="drawer-close" class="plain">Hotovo</button>
+    </header>
+    <div class="drawer-actions">
+      <button id="new-file-btn">＋ Nový soubor</button>
+      <button id="refresh-btn">↻ Stáhnout novinky</button>
+      <button id="switch-repo-btn">Jiný repozitář</button>
+    </div>
+    <ul id="tree" class="tree"></ul>
+    <button id="logout-btn" class="danger">Odhlásit z tohoto telefonu</button>
+  </div>
+</div>
+
+<script src="vendor/marked.min.js"></script>
+<script src="vendor/purify.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
