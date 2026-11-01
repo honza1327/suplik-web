@@ -102,6 +102,7 @@ async function start() {
   if (!state.repo) { await showRepos(); return; }
   show('main');
   renderPins();
+  syncPins();
   await openRepo(state.repo);
   const last = store.get('lastFile');
   if (last && last.repo === state.repo && state.files.includes(last.path)) await openFile(last.path);
@@ -514,6 +515,58 @@ function renderPins() {
   $('pin-btn').disabled = !cur;
 }
 
+// Rychlé odkazy jsou sdílené s Macem: leží v souboru v soukromém úložišti Šuplíku na GitHubu.
+const PINS_PATH = 'nastaveni/rychle-odkazy.json';
+let pinsSha = null;
+const pinsUrl = () => `/repos/${state.login}/suplik/contents/${PINS_PATH}`;
+
+function setPins(pins) {
+  state.pins = pins;
+  store.set('pins', pins);
+  renderPins();
+  pushPins();
+}
+
+async function syncPins() {
+  try {
+    if (!state.login) { state.login = (await gh('/user')).login; store.set('login', state.login); }
+    const file = await gh(pinsUrl());
+    pinsSha = file.sha;
+    const remote = JSON.parse(decodeBase64Utf8(file.content));
+    if (Array.isArray(remote) && JSON.stringify(remote) !== JSON.stringify(state.pins)) {
+      state.pins = remote;
+      store.set('pins', remote);
+      renderPins();
+    }
+  } catch (err) {
+    if (err instanceof GitHubError && err.status === 404) { pinsSha = null; await pushPins(); }
+    // jinak (bez signálu apod.) zůstanou odkazy uložené v telefonu
+  }
+}
+
+async function pushPins() {
+  if (!state.login) return;
+  const put = () => gh(pinsUrl(), {
+    method: 'PUT',
+    body: JSON.stringify({
+      message: 'Rychlé odkazy (iPhone)',
+      content: encodeUtf8Base64(JSON.stringify(state.pins || [], null, 2) + '\n'),
+      sha: pinsSha || undefined,
+    }),
+  });
+  try {
+    pinsSha = (await put()).content.sha;
+  } catch (err) {
+    if (!(err instanceof GitHubError) || (err.status !== 409 && err.status !== 422)) return;
+    try {
+      pinsSha = (await gh(pinsUrl())).sha;
+      pinsSha = (await put()).content.sha;
+    } catch { /* příště */ }
+  }
+}
+
+document.addEventListener('visibilitychange', () => { if (!document.hidden && state.token) syncPins(); });
+
 async function openPin(pin) {
   if (pin.repo !== state.repo) {
     if (!(await leaveFile())) return;
@@ -522,9 +575,7 @@ async function openPin(pin) {
   if (!state.files.includes(pin.path)) {
     setStatus(`Soubor ${pin.path} v repozitáři ${pin.repo} už není`);
     if (confirm(`Soubor ${pin.path.split('/').pop()} už neexistuje. Odebrat ho z rychlých odkazů?`)) {
-      state.pins = state.pins.filter((p) => !samePin(p, pin));
-      store.set('pins', state.pins);
-      renderPins();
+      setPins(state.pins.filter((p) => !samePin(p, pin)));
     }
     return;
   }
@@ -537,9 +588,7 @@ $('pin-btn').addEventListener('click', () => {
   const pins = state.pins || [];
   const i = pins.findIndex((p) => samePin(p, cur));
   if (i >= 0) pins.splice(i, 1); else pins.push(cur);
-  state.pins = pins;
-  store.set('pins', pins);
-  renderPins();
+  setPins(pins);
   setStatus(i >= 0 ? 'Odebráno z rychlých odkazů' : 'Přidáno do rychlých odkazů nahoře');
 });
 
