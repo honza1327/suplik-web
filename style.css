@@ -201,3 +201,6 @@ input[type=password], input[type=search], input[type=text] {
 .markdown th, .markdown td { border: 1px solid var(--line); padding: 4px 8px; }
 .markdown img { max-width: 100%; }
 .markdown hr { border: 0; border-top: 1px solid var(--line); margin: 1.5em 0; }
+.toolbar .fmt-b { font-weight: 700; }
+.toolbar .fmt-i { font-style: italic; }
+.toolbar .fmt-s { text-decoration: line-through; }

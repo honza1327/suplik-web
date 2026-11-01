@@ -550,9 +550,9 @@ const FORMATS = [
   { label: '☐', line: '- [ ] ' },
   { label: '❝', line: '> ' },
   null,
-  { label: 'B', wrap: '**', style: 'font-weight:700' },
-  { label: 'I', wrap: '*', style: 'font-style:italic' },
-  { label: 'S', wrap: '~~', style: 'text-decoration:line-through' },
+  { label: 'B', wrap: '**', cls: 'fmt-b' },
+  { label: 'I', wrap: '*', cls: 'fmt-i' },
+  { label: 'S', wrap: '~~', cls: 'fmt-s' },
   { label: '</>', wrap: '`' },
   { label: '🔗', link: true },
   null,
@@ -568,7 +568,7 @@ function buildToolbar() {
     if (!f) { const s = document.createElement('span'); s.className = 'sep'; bar.append(s); continue; }
     const b = document.createElement('button');
     b.textContent = f.label;
-    if (f.style) b.setAttribute('style', f.style);
+    if (f.cls) b.className = f.cls;
     // Klepnutí nesmí vzít editoru kurzor (a schovat klávesnici).
     b.addEventListener('pointerdown', (e) => e.preventDefault());
     b.addEventListener('mousedown', (e) => e.preventDefault());
