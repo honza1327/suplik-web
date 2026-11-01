@@ -388,6 +388,7 @@ async function newFile() {
 // Rozepsaný text se průběžně ukládá do telefonu, aby se neztratil při zavření aplikace.
 let draftTimer = null;
 editor.addEventListener('input', () => {
+  if (!$('findbar').hidden) computeHits(false);
   renderHighlight();
   renderDirty();
   schedulePreview();
@@ -413,7 +414,10 @@ function renderFile() {
   const mode = md ? effectiveMode() : 'edit';
   $('toolbar').hidden = !md || mode === 'preview';
   $('edit-wrap').hidden = !has || mode === 'preview';
-  $('edit-wrap').classList.toggle('on', md && Highlight.ok);
+  $('edit-wrap').classList.toggle('on', has && Highlight.ok);
+  $('find-btn').disabled = !has;
+  if (!has) closeFind();
+  else if (!$('findbar').hidden) computeHits(true);
   renderHighlight();
   preview.hidden = !has || mode === 'edit';
   $('work').classList.toggle('split', mode === 'split');
@@ -464,7 +468,8 @@ function renderHighlight() {
   const wrap = $('edit-wrap');
   if (!wrap.classList.contains('on') || wrap.hidden) return;
   const hl = $('hl');
-  hl.innerHTML = Highlight.html(editor.value) + '\n ';
+  const marks = finder.hits.map(([a, b], i) => [a, b, i === finder.cur ? 'md-find-cur' : 'md-find']);
+  hl.innerHTML = Highlight.html(editor.value, { markdown: isMarkdown(state.path), marks }) + '\n ';
   hl.scrollTop = editor.scrollTop;
 }
 if (/iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)) {
@@ -663,6 +668,93 @@ function applyFormat(f) {
     replaceRange(s, e, text, s + text.length, s + text.length);
   }
 }
+
+// MARK: Hledání v souboru
+
+const finder = { hits: [], cur: -1 };
+
+// Bez ohledu na velikost písmen a háčky/čárky („mleko“ najde i „Mléko“); délka textu zůstává stejná.
+function fold(s) {
+  let out = '';
+  for (let i = 0; i < s.length; i++) {
+    const f = s[i].normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+    out += f.length === 1 ? f : s[i];
+  }
+  return out;
+}
+
+function computeHits(jump) {
+  const q = fold($('find-input').value);
+  const prev = finder.hits[finder.cur];
+  finder.hits = [];
+  if (q) {
+    const hay = fold(editor.value);
+    for (let at = hay.indexOf(q); at >= 0; at = hay.indexOf(q, at + q.length)) finder.hits.push([at, at + q.length]);
+  }
+  if (!finder.hits.length) finder.cur = -1;
+  else if (jump) {
+    const from = prev ? prev[0] : editor.selectionStart;
+    const i = finder.hits.findIndex(([a]) => a >= from);
+    finder.cur = i >= 0 ? i : 0;
+  } else finder.cur = Math.min(Math.max(finder.cur, 0), finder.hits.length - 1);
+  renderFindCount();
+}
+
+function renderFindCount() {
+  const q = $('find-input').value;
+  $('find-count').textContent = !q ? '' : finder.hits.length ? `${finder.cur + 1}/${finder.hits.length}` : '0';
+  $('find-prev').disabled = $('find-next').disabled = finder.hits.length < 2;
+}
+
+function showHit() {
+  renderHighlight();
+  renderFindCount();
+  const hit = finder.hits[finder.cur];
+  if (!hit) return;
+  editor.setSelectionRange(hit[0], hit[1]);
+  const el = $('hl').querySelector('.md-find-cur');
+  if (el) {
+    editor.scrollTop = Math.max(0, el.offsetTop - editor.clientHeight / 3);
+    $('hl').scrollTop = editor.scrollTop;
+  }
+}
+
+function step(delta) {
+  if (!finder.hits.length) return;
+  finder.cur = (finder.cur + delta + finder.hits.length) % finder.hits.length;
+  showHit();
+}
+
+function openFind() {
+  if (!state.path) return;
+  if (state.mode === 'preview') { state.mode = 'edit'; store.set('mode', 'edit'); renderFile(); }
+  $('findbar').hidden = false;
+  const sel = editor.value.slice(editor.selectionStart, editor.selectionEnd);
+  if (sel && !sel.includes('\n')) $('find-input').value = sel;
+  $('find-input').focus();
+  $('find-input').select();
+  computeHits(true);
+  showHit();
+}
+
+function closeFind() {
+  if ($('findbar').hidden) return;
+  $('findbar').hidden = true;
+  finder.hits = [];
+  finder.cur = -1;
+  renderHighlight();
+}
+
+$('find-btn').addEventListener('click', () => ($('findbar').hidden ? openFind() : closeFind()));
+$('find-close').addEventListener('click', closeFind);
+$('find-next').addEventListener('click', () => step(1));
+$('find-prev').addEventListener('click', () => step(-1));
+$('find-input').addEventListener('input', () => { finder.cur = -1; computeHits(true); showHit(); });
+$('find-input').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') { e.preventDefault(); step(e.shiftKey ? -1 : 1); }
+  if (e.key === 'Escape') closeFind();
+});
+for (const b of [$('find-prev'), $('find-next')]) b.addEventListener('pointerdown', (e) => e.preventDefault());
 
 // MARK: Spuštění
 

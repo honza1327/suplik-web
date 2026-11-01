@@ -58,6 +58,7 @@
       <div id="file-title">Šuplík</div>
       <div id="repo-title" class="sub"></div>
     </div>
+    <button id="find-btn" class="icon" aria-label="Hledat v souboru" disabled>⌕</button>
     <button id="pin-btn" class="icon" aria-label="Připnout">☆</button>
     <button id="save-btn" class="primary small" disabled>Uložit</button>
   </header>
@@ -68,6 +69,13 @@
     <button data-mode="preview">Náhled</button>
   </div>
   <div id="toolbar" class="toolbar" hidden></div>
+  <div id="findbar" class="findbar" hidden>
+    <input id="find-input" type="search" placeholder="Hledat v souboru" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="search">
+    <span id="find-count"></span>
+    <button id="find-prev" aria-label="Předchozí">▲</button>
+    <button id="find-next" aria-label="Další">▼</button>
+    <button id="find-close" class="plain">Hotovo</button>
+  </div>
   <div id="work" class="work">
     <div id="edit-wrap" class="edit-wrap">
       <pre id="hl" class="hl" aria-hidden="true"></pre>

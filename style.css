@@ -13,6 +13,8 @@
   --md-accent: #0a66d8;
   --md-mark: #d9730d;
   --md-code: #c7254e;
+  --find: rgba(255, 200, 0, .35);
+  --find-cur: rgba(255, 150, 0, .75);
 }
 @media (prefers-color-scheme: dark) {
   :root {
@@ -30,6 +32,8 @@
     --md-accent: #4a9bff;
     --md-mark: #f0a03c;
     --md-code: #ff6b8b;
+    --find: rgba(255, 200, 0, .25);
+    --find-cur: rgba(255, 150, 0, .6);
   }
 }
 
@@ -174,6 +178,13 @@ input[type=password], input[type=search], input[type=text] {
 .md-muted { color: var(--muted); }
 .md-link { color: var(--accent); }
 .md-dim { color: var(--md-dim); }
+.findbar { display: flex; align-items: center; gap: 6px; padding: 6px 12px; background: var(--panel); border-bottom: 1px solid var(--line); flex-shrink: 0; }
+.findbar input { flex: 1; min-width: 0; padding: 6px 10px; }
+.findbar #find-count { font-size: 13px; color: var(--muted); min-width: 34px; text-align: center; }
+.findbar button { padding: 5px 9px; color: var(--text); }
+#find-btn { font-size: 26px; padding: 0 6px; }
+.md-find { background: var(--find); border-radius: 2px; }
+.md-find-cur { background: var(--find-cur); border-radius: 2px; }
 .md-code { color: var(--md-code); font-weight: 400; font-style: normal; text-decoration: none; }
 #preview {
   flex: 1;

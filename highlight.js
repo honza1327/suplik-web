@@ -29,7 +29,8 @@ const Highlight = (() => {
 
   const esc = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
-  function html(text) {
+  // marks: další zvýraznění [začátek, konec, třída] (např. nálezy hledání); markdown=false jen pro ně.
+  function html(text, { markdown = true, marks = [] } = {}) {
     if (!rules) return esc(text);
     const n = text.length;
     const cls = new Array(n).fill('');
@@ -45,6 +46,12 @@ const Highlight = (() => {
     };
     const ends = (span, len) => { add([span[0], span[0] + len], 'md-dim'); add([span[1] - len, span[1]], 'md-dim'); };
 
+    if (markdown) markdownRules(text, cls, add, set, each, ends);
+    for (const [s, e, c] of marks) add([s, e], c);
+    return render(text, cls);
+  }
+
+  function markdownRules(text, cls, add, set, each, ends) {
     each(rules.heading, (ix) => { add(ix[0], 'md-h'); add(ix[1], 'md-dim'); });
     each(rules.list, (ix) => add(ix[1], 'md-mark'));
     each(rules.task, (ix, m) => {
@@ -65,7 +72,10 @@ const Highlight = (() => {
     // Kód má přednost: uvnitř se nic dalšího nebarví.
     each(rules.code, (ix) => set(ix[0], ' md-code'));
     each(rules.fence, (ix) => set(ix[0], ' md-code'));
+  }
 
+  function render(text, cls) {
+    const n = text.length;
     let out = '';
     let i = 0;
     while (i < n) {
