@@ -484,6 +484,18 @@ if (document.documentElement.classList.contains('ios')) {
   editor.addEventListener('blur', () => { $('edit-wrap').classList.remove('typing'); renderHighlight(); });
 }
 
+// Safari na iPhonu kreslí kurzor ve „připíchnutém“ rozvržení (position: fixed) po vysunutí klávesnice
+// o kus vedle. Aplikace je proto obyčejná stránka s výškou přesně nad klávesnici a nesmí se posunout.
+if (window.visualViewport) {
+  const fit = () => {
+    document.documentElement.style.setProperty('--vv-height', visualViewport.height + 'px');
+    if (window.scrollY) window.scrollTo(0, 0);
+  };
+  visualViewport.addEventListener('resize', fit);
+  visualViewport.addEventListener('scroll', fit);
+  fit();
+}
+
 for (const b of document.querySelectorAll('#modes button')) {
   b.addEventListener('click', () => {
     state.mode = b.dataset.mode;

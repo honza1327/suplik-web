@@ -39,6 +39,7 @@
 
 * { box-sizing: border-box; }
 html, body { height: 100%; margin: 0; }
+body { position: relative; height: var(--vv-height, 100%); }
 body {
   background: var(--bg);
   color: var(--text);
@@ -74,8 +75,11 @@ input[type=password], input[type=search], input[type=text] {
 }
 
 .screen {
-  position: fixed;
-  inset: 0;
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: var(--vv-height, 100%);
   display: flex;
   flex-direction: column;
   padding: env(safe-area-inset-top) env(safe-area-inset-right) 0 env(safe-area-inset-left);
@@ -257,3 +261,4 @@ input[type=password], input[type=search], input[type=text] {
 .toolbar .fmt-b { font-weight: 700; }
 .toolbar .fmt-i { font-style: italic; }
 .toolbar .fmt-s { text-decoration: line-through; }
+.version { color: var(--muted); font-size: 12px; text-align: center; margin: 0 0 8px; }
