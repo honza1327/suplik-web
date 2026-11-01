@@ -116,7 +116,6 @@ $('login-form').addEventListener('submit', async (e) => {
       // Stejné výchozí rychlé odkazy jako na Macu.
       state.pins = [
         { repo: user.login + '/sekretarka', path: 'agenda/DNES.md' },
-        { repo: user.login + '/sekretarka', path: 'agenda/moje_poznamky.txt' },
       ];
       store.set('pins', state.pins);
     }
