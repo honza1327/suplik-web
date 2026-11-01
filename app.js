@@ -478,12 +478,12 @@ if (/iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'Mac
 }
 
 // iPhone: když vyjede klávesnice, Safari posouvá celou stránku a kurzor se pak kreslí jinde než text.
-// Proto aplikaci přichytíme přesně na viditelnou část obrazovky (nad klávesnici).
+// Proto má aplikace přesně výšku viditelné části (nad klávesnicí) a stránka se nesmí posunout.
+// (Žádné position: fixed – v něm Safari kreslí kurzor po posunu na špatném místě.)
 if (window.visualViewport) {
   const fit = () => {
-    const root = document.documentElement.style;
-    root.setProperty('--vv-top', visualViewport.offsetTop + 'px');
-    root.setProperty('--vv-height', visualViewport.height + 'px');
+    document.documentElement.style.setProperty('--vv-height', visualViewport.height + 'px');
+    if (window.scrollY || visualViewport.offsetTop) window.scrollTo(0, 0);
   };
   visualViewport.addEventListener('resize', fit);
   visualViewport.addEventListener('scroll', fit);
