@@ -69,7 +69,10 @@
   </div>
   <div id="toolbar" class="toolbar" hidden></div>
   <div id="work" class="work">
-    <textarea id="editor" spellcheck="true" autocapitalize="sentences"></textarea>
+    <div id="edit-wrap" class="edit-wrap">
+      <pre id="hl" class="hl" aria-hidden="true"></pre>
+      <textarea id="editor" spellcheck="true" autocapitalize="sentences"></textarea>
+    </div>
     <article id="preview" class="markdown"></article>
     <div id="empty" class="empty">Vyber soubor v menu ☰ nebo v rychlých odkazech nahoře.</div>
   </div>
@@ -95,6 +98,7 @@
 
 <script src="vendor/marked.min.js"></script>
 <script src="vendor/purify.min.js"></script>
+<script src="highlight.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

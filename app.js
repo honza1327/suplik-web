@@ -388,6 +388,7 @@ async function newFile() {
 // Rozepsaný text se průběžně ukládá do telefonu, aby se neztratil při zavření aplikace.
 let draftTimer = null;
 editor.addEventListener('input', () => {
+  renderHighlight();
   renderDirty();
   schedulePreview();
   clearTimeout(draftTimer);
@@ -411,7 +412,9 @@ function renderFile() {
   $('modes').hidden = !md;
   const mode = md ? effectiveMode() : 'edit';
   $('toolbar').hidden = !md || mode === 'preview';
-  editor.hidden = !has || mode === 'preview';
+  $('edit-wrap').hidden = !has || mode === 'preview';
+  $('edit-wrap').classList.toggle('on', md && Highlight.ok);
+  renderHighlight();
   preview.hidden = !has || mode === 'edit';
   $('work').classList.toggle('split', mode === 'split');
   for (const b of document.querySelectorAll('#modes button')) b.classList.toggle('active', b.dataset.mode === mode);
@@ -454,7 +457,19 @@ function syncPreview() {
   const ratio = max > 0 ? editor.scrollTop / max : 0;
   preview.scrollTop = ratio * (preview.scrollHeight - preview.clientHeight);
 }
-editor.addEventListener('scroll', syncPreview);
+editor.addEventListener('scroll', () => { $('hl').scrollTop = editor.scrollTop; syncPreview(); });
+
+// Obarvení Markdownu (kopie textu pod průhledným polem).
+function renderHighlight() {
+  const wrap = $('edit-wrap');
+  if (!wrap.classList.contains('on') || wrap.hidden) return;
+  const hl = $('hl');
+  hl.innerHTML = Highlight.html(editor.value) + '\n ';
+  hl.scrollTop = editor.scrollTop;
+}
+if (/iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)) {
+  document.documentElement.classList.add('ios');
+}
 
 for (const b of document.querySelectorAll('#modes button')) {
   b.addEventListener('click', () => {

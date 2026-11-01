@@ -1,7 +1,7 @@
 // Aplikace se spustí i bez signálu; při připojení si vždy stáhne nejnovější verzi.
-const CACHE = 'suplik-v5';
+const CACHE = 'suplik-v6';
 const FILES = ['./', 'index.html', 'style.css', 'app.js', 'manifest.webmanifest',
-  'vendor/marked.min.js', 'vendor/purify.min.js', 'icon-180.png', 'icon-192.png', 'icon-512.png'];
+  'highlight.js', 'vendor/marked.min.js', 'vendor/purify.min.js', 'icon-180.png', 'icon-192.png', 'icon-512.png'];
 
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(FILES)).then(() => self.skipWaiting()));

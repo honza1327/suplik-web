@@ -9,6 +9,10 @@
   --accent-soft: #d8e7fb;
   --danger: #c4312b;
   --code: #efefeb;
+  --md-dim: #b4b4b0;
+  --md-accent: #0a66d8;
+  --md-mark: #d9730d;
+  --md-code: #c7254e;
 }
 @media (prefers-color-scheme: dark) {
   :root {
@@ -22,6 +26,10 @@
     --accent-soft: #23395a;
     --danger: #ff6b62;
     --code: #2e2e31;
+    --md-dim: #5c5c61;
+    --md-accent: #4a9bff;
+    --md-mark: #f0a03c;
+    --md-code: #ff6b8b;
   }
 }
 
@@ -122,17 +130,51 @@ input[type=password], input[type=search], input[type=text] {
 
 /* Pracovní plocha */
 .work { flex: 1; display: flex; min-height: 0; background: var(--panel); }
+/* Editor: průhledné textové pole nad obarvenou kopií textu (pole samo barvy neumí). */
+.edit-wrap { flex: 1; position: relative; display: flex; min-width: 0; background: var(--panel); }
+#editor, .hl {
+  padding: 14px 16px 40vh;
+  font: 16px/1.5 ui-monospace, "SF Mono", Menlo, monospace;
+  letter-spacing: 0;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  word-break: normal;
+  tab-size: 4;
+}
 #editor {
   flex: 1;
+  position: relative;
+  z-index: 1;
+  margin: 0;
   border: 0;
   outline: none;
   resize: none;
-  padding: 14px 16px 40vh;
-  font: 16px/1.5 ui-monospace, "SF Mono", Menlo, monospace;
-  background: var(--panel);
+  background: transparent;
   color: var(--text);
   min-width: 0;
+  scrollbar-width: none;
 }
+#editor::-webkit-scrollbar { display: none; }
+.hl {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  overflow: hidden;
+  pointer-events: none;
+  color: var(--text);
+}
+.edit-wrap:not(.on) .hl { display: none; }
+.edit-wrap.on #editor { color: transparent; -webkit-text-fill-color: transparent; caret-color: var(--text); }
+.ios .hl { padding-left: 19px; padding-right: 19px; }
+.md-h { color: var(--md-accent); font-weight: 700; }
+.md-b { font-weight: 700; }
+.md-i { font-style: italic; }
+.md-s { text-decoration: line-through; color: var(--muted); }
+.md-mark { color: var(--md-mark); }
+.md-muted { color: var(--muted); }
+.md-link { color: var(--accent); }
+.md-dim { color: var(--md-dim); }
+.md-code { color: var(--md-code); font-weight: 400; font-style: normal; text-decoration: none; }
 #preview {
   flex: 1;
   overflow-y: auto;
@@ -140,7 +182,7 @@ input[type=password], input[type=search], input[type=text] {
   min-width: 0;
   -webkit-overflow-scrolling: touch;
 }
-.work.split #editor { border-right: 1px solid var(--line); }
+.work.split .edit-wrap { border-right: 1px solid var(--line); }
 .empty { flex: 1; display: flex; align-items: center; justify-content: center; text-align: center; color: var(--muted); padding: 24px; }
 
 .status {
