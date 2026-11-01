@@ -75,7 +75,10 @@ input[type=password], input[type=search], input[type=text] {
 
 .screen {
   position: fixed;
-  inset: 0;
+  left: 0;
+  right: 0;
+  top: var(--vv-top, 0);
+  height: var(--vv-height, 100%);
   display: flex;
   flex-direction: column;
   padding: env(safe-area-inset-top) env(safe-area-inset-right) 0 env(safe-area-inset-left);
