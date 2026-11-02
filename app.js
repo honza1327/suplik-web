@@ -620,7 +620,10 @@ $('drawer-close').addEventListener('click', closeDrawer);
 $('drawer').addEventListener('click', (e) => { if (e.target === $('drawer')) closeDrawer(); });
 $('new-file-btn').addEventListener('click', newFile);
 $('switch-repo-btn').addEventListener('click', () => { closeDrawer(); showRepos(); });
-$('refresh-btn').addEventListener('click', async () => {
+
+// MARK: Obnovení přetažením dolů (stáhne novinky z GitHubu)
+
+async function refresh() {
   if (!(await leaveFile())) return;
   closeDrawer();
   setStatus('Stahuji novinky…');
@@ -629,7 +632,49 @@ $('refresh-btn').addEventListener('click', async () => {
     if (state.path && state.files.includes(state.path)) await openFile(state.path, { quiet: true });
     setStatus('Aktuální');
   } catch (err) { setStatus(friendlyError(err)); }
-});
+}
+
+const PULL_TRIGGER = 70;   // o kolik bodů je potřeba stáhnout dolů
+const ptr = $('ptr');
+let pull = null;
+let refreshing = false;
+
+function pullStart(e) {
+  const el = e.currentTarget;
+  if (refreshing || e.touches.length !== 1 || el.scrollTop > 0) return;
+  if (el === editor && document.activeElement === editor) return;   // při psaní se jen posouvá text
+  pull = { el, y: e.touches[0].clientY, d: 0 };
+}
+function pullMove(e) {
+  if (!pull) return;
+  const dy = e.touches[0].clientY - pull.y;
+  if (pull.d === 0 && (dy < 0 || pull.el.scrollTop > 0)) { pull = null; return; }   // posouvá se obsah
+  pull.d = Math.max(0, dy);
+  const ready = pull.d > PULL_TRIGGER;
+  ptr.hidden = false;
+  ptr.style.transform = `translate(-50%, ${Math.min(pull.d / 2, 50)}px)`;
+  ptr.classList.toggle('ready', ready);
+  ptr.textContent = ready ? '↑ Pusť a stáhnu novinky' : '↓ Táhni dolů pro obnovení';
+}
+async function pullEnd() {
+  if (!pull) return;
+  const go = pull.d > PULL_TRIGGER;
+  pull = null;
+  if (!go) { ptr.hidden = true; return; }
+  refreshing = true;
+  ptr.textContent = '↻ Stahuji novinky…';
+  try { await refresh(); } finally {
+    refreshing = false;
+    ptr.hidden = true;
+    ptr.classList.remove('ready');
+  }
+}
+for (const el of [editor, preview, $('empty'), $('tree')]) {
+  el.addEventListener('touchstart', pullStart, { passive: true });
+  el.addEventListener('touchmove', pullMove, { passive: true });
+  el.addEventListener('touchend', pullEnd);
+  el.addEventListener('touchcancel', () => { pull = null; ptr.hidden = true; });
+}
 $('logout-btn').addEventListener('click', () => {
   if (isDirty() && !confirm('Máš neuložené změny. Opravdu se odhlásit? Změny zůstanou jen v tomto telefonu.')) return;
   if (!confirm('Odhlásit Šuplík z tohoto telefonu? Klíč se z telefonu smaže.')) return;

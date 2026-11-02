@@ -1,5 +1,5 @@
 // Aplikace se spustí i bez signálu; při připojení si vždy stáhne nejnovější verzi.
-const CACHE = 'suplik-v12';
+const CACHE = 'suplik-v13';
 const FILES = ['./', 'index.html', 'style.css', 'app.js', 'manifest.webmanifest',
   'highlight.js', 'vendor/marked.min.js', 'vendor/purify.min.js', 'icon-180.png', 'icon-192.png', 'icon-512.png'];
 

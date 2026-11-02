@@ -137,7 +137,10 @@ input[type=password], input[type=search], input[type=text] {
 @media (min-width: 800px) { .wide-only { display: block; } }
 
 /* Pracovní plocha */
-.work { flex: 1; display: flex; min-height: 0; background: var(--panel); }
+.work { flex: 1; display: flex; min-height: 0; background: var(--panel); position: relative; }
+.ptr { position: absolute; top: 4px; left: 50%; transform: translate(-50%, 0); z-index: 5; pointer-events: none; white-space: nowrap;
+  font-size: 14px; padding: 6px 14px; border-radius: 16px; background: var(--chip); color: var(--muted); box-shadow: 0 2px 8px rgba(0,0,0,.15); }
+.ptr.ready { background: var(--accent); color: #fff; }
 /* Editor: průhledné textové pole nad obarvenou kopií textu (pole samo barvy neumí). */
 .edit-wrap { flex: 1; position: relative; display: flex; min-width: 0; background: var(--panel); }
 #editor, .hl {
