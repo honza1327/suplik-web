@@ -446,7 +446,113 @@ function renderPreview() {
   const html = marked.parse(editor.value);
   preview.innerHTML = DOMPurify.sanitize(html, { ADD_ATTR: ['target'] });
   for (const a of preview.querySelectorAll('a[href]')) { a.target = '_blank'; a.rel = 'noopener'; }
-  for (const box of preview.querySelectorAll('input[type=checkbox]')) box.disabled = true;
+  for (const box of preview.querySelectorAll('input[type=checkbox]')) box.disabled = false;
+}
+
+// MARK: Drobné úpravy v náhledu
+
+// Klepnutí na úkol ho odškrtne, dvojité klepnutí na slovo ho dovolí přepsat.
+// Úprava se za chvilku sama uloží a odešle na GitHub.
+const TASK_LINE = /^([ \t]*(?:>[ \t]*)*(?:[-*+]|\d+[.)])[ \t]+)\[([ xX])\]/;
+const WORD_CHAR = /[\p{L}\p{N}_]/u;
+const wordRe = (w) => new RegExp('(?<![\\p{L}\\p{N}_])' + w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(?![\\p{L}\\p{N}_])', 'gu');
+
+/// Čísla řádků s úkoly (mimo bloky kódu), ve stejném pořadí jako zaškrtávátka v náhledu.
+function taskLines(lines) {
+  const out = [];
+  let fence = null;
+  lines.forEach((line, i) => {
+    const f = line.match(/^[ \t]*(`{3,}|~{3,})/);
+    if (f) { if (!fence) fence = f[1]; else if (f[1].startsWith(fence)) fence = null; return; }
+    if (!fence && TASK_LINE.test(line)) out.push(i);
+  });
+  return out;
+}
+
+let autoSaveTimer = null;
+function applyPreviewEdit(text) {
+  const top = preview.scrollTop;
+  editor.value = text;
+  renderHighlight();
+  renderDirty();
+  renderPreview();
+  preview.scrollTop = top;
+  storeDraft();
+  clearTimeout(autoSaveTimer);
+  autoSaveTimer = setTimeout(() => { if (isDirty()) save(); }, 1500);
+}
+
+let lastTap = null;
+preview.addEventListener('click', (e) => {
+  const box = e.target.closest('input[type=checkbox]');
+  if (box) {
+    e.preventDefault();
+    const boxes = [...preview.querySelectorAll('input[type=checkbox]')];
+    const lines = editor.value.split('\n');
+    const tasks = taskLines(lines);
+    if (tasks.length !== boxes.length) { setStatus('Úkol nejde v náhledu odškrtnout – uprav ho v editoru'); return; }
+    const i = tasks[boxes.indexOf(box)];
+    lines[i] = lines[i].replace(TASK_LINE, (m, lead, mark) => lead + (mark === ' ' ? '[x]' : '[ ]'));
+    applyPreviewEdit(lines.join('\n'));
+    return;
+  }
+  // Dvojité klepnutí (na iPhonu nepřichází dblclick, proto se hlídá čas mezi klepnutími).
+  const now = Date.now();
+  const double = lastTap && now - lastTap.t < 400 && Math.hypot(e.clientX - lastTap.x, e.clientY - lastTap.y) < 30;
+  lastTap = double ? null : { t: now, x: e.clientX, y: e.clientY };
+  if (double && !e.target.closest('a, pre, code, .preview-edit')) editWordAt(e.clientX, e.clientY);
+});
+
+function editWordAt(x, y) {
+  const hit = document.caretRangeFromPoint && document.caretRangeFromPoint(x, y);
+  const node = hit && hit.startContainer;
+  if (!node || node.nodeType !== 3 || !preview.contains(node)) return;
+  let a = hit.startOffset, b = a;
+  while (a > 0 && WORD_CHAR.test(node.data[a - 1])) a--;
+  while (b < node.data.length && WORD_CHAR.test(node.data[b])) b++;
+  if (a === b) return;
+  const range = document.createRange();
+  range.setStart(node, a);
+  range.setEnd(node, b);
+  const old = range.toString();
+  const re = wordRe(old);
+  const before = document.createRange();
+  before.selectNodeContents(preview);
+  before.setEnd(node, a);
+  const nth = (before.toString().match(re) || []).length;
+  const total = (preview.textContent.match(re) || []).length;
+  const rect = range.getBoundingClientRect(), box = preview.getBoundingClientRect();
+  window.getSelection().removeAllRanges();
+
+  const input = document.createElement('input');
+  input.className = 'preview-edit';
+  input.value = old;
+  input.enterKeyHint = 'done';
+  input.setAttribute('autocapitalize', 'off');
+  input.style.left = (rect.left - box.left + preview.scrollLeft - 4) + 'px';
+  input.style.top = (rect.top - box.top + preview.scrollTop - 3) + 'px';
+  const fit = () => { input.style.width = (Math.max(old.length, input.value.length) + 3) + 'ch'; };
+  fit();
+  let done = false;
+  const finish = (ok) => {
+    if (done) return;
+    done = true;
+    input.remove();
+    if (!ok || input.value === old) return;
+    const matches = [...editor.value.matchAll(re)];
+    const m = matches.length === total ? matches[nth] : matches.length === 1 ? matches[0] : null;
+    if (!m) { setStatus('Tohle slovo nejde v náhledu jednoznačně najít – uprav ho v editoru'); return; }
+    applyPreviewEdit(editor.value.slice(0, m.index) + input.value + editor.value.slice(m.index + old.length));
+  };
+  input.addEventListener('input', fit);
+  input.addEventListener('keydown', (ev) => {
+    if (ev.key === 'Enter') { ev.preventDefault(); finish(true); }
+    if (ev.key === 'Escape') { ev.preventDefault(); finish(false); }
+  });
+  input.addEventListener('blur', () => finish(true));
+  preview.append(input);
+  input.focus();
+  input.select();
 }
 
 let previewTimer = null;
