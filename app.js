@@ -443,19 +443,37 @@ function renderDirty() {
 marked.setOptions({ gfm: true, breaks: false });
 
 function renderPreview() {
-  const html = marked.parse(editor.value);
-  preview.innerHTML = DOMPurify.sanitize(html, { ADD_ATTR: ['target'] });
+  // Každý blok se vykreslí zvlášť a dostane čísla řádků zdroje (data-start/data-end),
+  // aby šlo vzkaz z náhledu připsat na správný řádek.
+  const src = editor.value.replace(/\r\n?/g, '\n');
+  const tokens = marked.lexer(src);
+  preview.textContent = '';
+  let pos = 0;
+  for (const tok of tokens) {
+    const at = tok.raw ? src.indexOf(tok.raw, pos) : -1;
+    if (at >= 0) pos = at + tok.raw.length;
+    if (tok.type === 'space') continue;
+    const one = [tok];
+    one.links = tokens.links;
+    const tpl = document.createElement('template');
+    tpl.innerHTML = DOMPurify.sanitize(marked.parser(one), { ADD_ATTR: ['target'] });
+    if (at >= 0) {
+      const start = src.slice(0, at).split('\n').length - 1;
+      const end = start + tok.raw.replace(/\n+$/, '').split('\n').length;
+      for (const el of tpl.content.children) { el.dataset.start = start; el.dataset.end = end; }
+    }
+    preview.append(tpl.content);
+  }
   for (const a of preview.querySelectorAll('a[href]')) { a.target = '_blank'; a.rel = 'noopener'; }
   for (const box of preview.querySelectorAll('input[type=checkbox]')) box.disabled = false;
 }
 
 // MARK: Drobné úpravy v náhledu
 
-// Klepnutí na úkol ho odškrtne, dvojité klepnutí na slovo ho dovolí přepsat.
+// Klepnutí na úkol ho odškrtne, dvojité klepnutí na řádek otevře políčko pro vzkaz Sekretářce
+// (připíše se na konec řádku jako „💬 …“ a Sekretářka ho při dalším běhu zpracuje).
 // Úprava se za chvilku sama uloží a odešle na GitHub.
 const TASK_LINE = /^([ \t]*(?:>[ \t]*)*(?:[-*+]|\d+[.)])[ \t]+)\[([ xX])\]/;
-const WORD_CHAR = /[\p{L}\p{N}_]/u;
-const wordRe = (w) => new RegExp('(?<![\\p{L}\\p{N}_])' + w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(?![\\p{L}\\p{N}_])', 'gu');
 
 /// Čísla řádků s úkoly (mimo bloky kódu), ve stejném pořadí jako zaškrtávátka v náhledu.
 function taskLines(lines) {
@@ -500,59 +518,68 @@ preview.addEventListener('click', (e) => {
   const now = Date.now();
   const double = lastTap && now - lastTap.t < 400 && Math.hypot(e.clientX - lastTap.x, e.clientY - lastTap.y) < 30;
   lastTap = double ? null : { t: now, x: e.clientX, y: e.clientY };
-  if (double && !e.target.closest('a, pre, code, .preview-edit')) editWordAt(e.clientX, e.clientY);
+  if (double && !e.target.closest('a, pre, .preview-note')) openNote(e.target);
 });
 
-function editWordAt(x, y) {
-  const hit = document.caretRangeFromPoint && document.caretRangeFromPoint(x, y);
-  const node = hit && hit.startContainer;
-  if (!node || node.nodeType !== 3 || !preview.contains(node)) return;
-  let a = hit.startOffset, b = a;
-  while (a > 0 && WORD_CHAR.test(node.data[a - 1])) a--;
-  while (b < node.data.length && WORD_CHAR.test(node.data[b])) b++;
-  if (a === b) return;
-  const range = document.createRange();
-  range.setStart(node, a);
-  range.setEnd(node, b);
-  const old = range.toString();
-  const re = wordRe(old);
-  const before = document.createRange();
-  before.selectNodeContents(preview);
-  before.setEnd(node, a);
-  const nth = (before.toString().match(re) || []).length;
-  const total = (preview.textContent.match(re) || []).length;
-  const rect = range.getBoundingClientRect(), box = preview.getBoundingClientRect();
-  window.getSelection().removeAllRanges();
+const LIST_ITEM = /^[ \t]*(?:>[ \t]*)*(?:[-*+]|\d+[.)])(?:[ \t]|$)/;
 
+/// Řádek zdroje (od 0), na jehož konec patří vzkaz k danému prvku náhledu; null = nejde určit.
+function noteLine(el, lines) {
+  const block = el.closest('[data-start]');
+  if (!block) return null;
+  const start = +block.dataset.start, end = +block.dataset.end;
+  const lastFilled = (from, to) => {
+    for (let i = to - 1; i >= from; i--) if (lines[i].trim()) return i;
+    return null;
+  };
+  if (el.tagName === 'LI') {
+    const items = [...block.querySelectorAll('li')];
+    const marks = [];
+    for (let i = start; i < end; i++) if (LIST_ITEM.test(lines[i])) marks.push(i);
+    if (marks.length !== items.length) return null;
+    const k = items.indexOf(el);
+    return lastFilled(marks[k], k + 1 < marks.length ? marks[k + 1] : end);
+  }
+  if (el.tagName === 'TR') {
+    const k = [...block.querySelectorAll('tr')].indexOf(el);
+    return k < 0 ? null : start + (k === 0 ? 0 : k + 1);
+  }
+  return lastFilled(start, end);
+}
+
+function openNote(target) {
+  const el = target.closest('li, tr, p, h1, h2, h3, h4, h5, h6');
+  if (!el || !preview.contains(el)) return;
+  for (const n of preview.querySelectorAll('.preview-note')) n.remove();
+  window.getSelection().removeAllRanges();
   const input = document.createElement('input');
-  input.className = 'preview-edit';
-  input.value = old;
-  input.enterKeyHint = 'done';
-  input.setAttribute('autocapitalize', 'off');
-  input.style.left = (rect.left - box.left + preview.scrollLeft - 4) + 'px';
-  input.style.top = (rect.top - box.top + preview.scrollTop - 3) + 'px';
-  const fit = () => { input.style.width = (Math.max(old.length, input.value.length) + 3) + 'ch'; };
-  fit();
+  input.className = 'preview-note';
+  input.placeholder = '💬 Vzkaz pro Sekretářku';
+  input.enterKeyHint = 'send';
   let done = false;
   const finish = (ok) => {
     if (done) return;
     done = true;
     input.remove();
-    if (!ok || input.value === old) return;
-    const matches = [...editor.value.matchAll(re)];
-    const m = matches.length === total ? matches[nth] : matches.length === 1 ? matches[0] : null;
-    if (!m) { setStatus('Tohle slovo nejde v náhledu jednoznačně najít – uprav ho v editoru'); return; }
-    applyPreviewEdit(editor.value.slice(0, m.index) + input.value + editor.value.slice(m.index + old.length));
+    const note = input.value.replace(/\s+/g, ' ').trim();
+    if (!ok || !note) return;
+    const lines = editor.value.split('\n');
+    const i = noteLine(el, lines);
+    if (i === null) { setStatus('Tohle nejde v náhledu upravit – udělej to v editoru'); return; }
+    const line = lines[i].replace(/\s+$/, '');
+    lines[i] = line.endsWith('|') ? line.slice(0, -1).replace(/\s+$/, '') + ' 💬 ' + note + ' |' : line + ' 💬 ' + note;
+    applyPreviewEdit(lines.join('\n'));
   };
-  input.addEventListener('input', fit);
   input.addEventListener('keydown', (ev) => {
     if (ev.key === 'Enter') { ev.preventDefault(); finish(true); }
     if (ev.key === 'Escape') { ev.preventDefault(); finish(false); }
   });
   input.addEventListener('blur', () => finish(true));
-  preview.append(input);
+  // Políčko se vsune pod řádek (před případné vnořené odrážky), ostatní text odsune níž.
+  const nested = el.tagName === 'LI' && el.querySelector(':scope > ul, :scope > ol');
+  if (nested) el.insertBefore(input, nested);
+  else (el.tagName === 'TR' ? el.lastElementChild : el).append(input);
   input.focus();
-  input.select();
 }
 
 let previewTimer = null;

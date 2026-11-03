@@ -268,8 +268,8 @@ input[type=password], input[type=search], input[type=text] {
 .toolbar .fmt-s { text-decoration: line-through; }
 .version { color: var(--muted); font-size: 12px; text-align: center; margin: 0 0 8px; }
 .markdown li > input[type=checkbox] { cursor: pointer; }
-.preview-edit {
-  position: absolute; z-index: 5; margin: 0; padding: 2px 4px;
+.preview-note {
+  display: block; width: 100%; margin: 4px 0 6px; padding: 6px 10px; box-sizing: border-box;
   font: inherit; font-size: 16px; color: var(--text); background: var(--bg);
   border: 1px solid var(--accent); border-radius: 5px; outline: none;
   box-shadow: 0 2px 8px rgba(0,0,0,.2);
