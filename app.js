@@ -284,6 +284,7 @@ async function openFile(path, { quiet = false } = {}) {
   try {
     const file = await gh(`/repos/${state.repo}/contents/${encodePath(path)}?ref=${encodeURIComponent(state.branch)}`);
     if (Array.isArray(file) || file.type !== 'file') throw new Error('není soubor');
+    if (quiet && path === state.path && file.sha === state.sha) { setStatus('Aktuální'); return; }   // beze změny – nechat, kde jsi
     let text;
     if (file.encoding === 'base64' && file.content) text = decodeBase64Utf8(file.content);
     else if (file.size === 0) text = '';
@@ -584,7 +585,12 @@ async function pushPins() {
   }
 }
 
-document.addEventListener('visibilitychange', () => { if (!document.hidden && state.token) syncPins(); });
+// Po návratu do aplikace stáhnout odkazy i otevřený soubor, pokud se mezitím změnil jinde (Mac, Sekretářka).
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden || !state.token) return;
+  syncPins();
+  if (state.path && !isDirty() && !state.saving && !refreshing) openFile(state.path, { quiet: true });
+});
 
 async function openPin(pin) {
   if (pin.repo !== state.repo) {
