@@ -303,6 +303,7 @@ async function openFile(path, { quiet = false } = {}) {
     preview.scrollTop = 0;
     renderFile();
     renderTree();
+    syncPosition(true);
     if (!quiet) setStatus(restored ? 'Obnoven neuložený koncept – nezapomeň uložit.' : 'Otevřeno');
   } catch (err) {
     if (err instanceof GitHubError) setStatus(friendlyError(err));
@@ -632,9 +633,11 @@ if (window.visualViewport) {
 
 for (const b of document.querySelectorAll('#modes button')) {
   b.addEventListener('click', () => {
+    const line = readingLine();
     state.mode = b.dataset.mode;
     store.set('mode', state.mode);
     renderFile();
+    if (line !== null) applyPosition(line);
   });
 }
 window.addEventListener('resize', () => { if (state.path) renderFile(); });
@@ -723,7 +726,157 @@ document.addEventListener('visibilitychange', () => {
   if (document.hidden || !state.token) return;
   syncPins();
   if (state.path && !isDirty() && !state.saving && !refreshing) openFile(state.path, { quiet: true });
+  syncPosition(false);
 });
+// Při odchodu z aplikace hned odeslat, kde čteš (jinak by Mac viděl starou pozici).
+document.addEventListener('visibilitychange', () => { if (document.hidden && posTimer) { clearTimeout(posTimer); pushPositions(); } });
+
+// MARK: Pozice čtení (sdílená s Macem)
+
+// Pozice = řádek zdrojového textu nahoře v okně (s desetinnou částí, od 1; 0 = začátek, -1 = konec).
+// Ukládá se do nastaveni/pozice-cteni.json v úložišti Šuplíku, stejně jako rychlé odkazy.
+const POS_PATH = 'nastaveni/pozice-cteni.json';
+const PREVIEW_TOP = 14;
+let positions = store.get('positions', {});
+let posSha = null;
+let posReady = false;
+let posTimer = null;
+let posQuietUntil = 0;
+const posUrl = () => `/repos/${state.login}/suplik/contents/${POS_PATH}`;
+const posKey = () => (state.path ? `${state.repo}/${state.path}` : null);
+
+function mergePositions(a, b) {
+  const out = { ...a };
+  for (const [k, v] of Object.entries(b || {})) if (v && typeof v.line === 'number' && (!out[k] || out[k].at < v.at)) out[k] = v;
+  const keys = Object.keys(out).sort((x, y) => out[y].at - out[x].at);
+  for (const k of keys.slice(200)) delete out[k];
+  return out;
+}
+
+const previewBlocks = () => preview.querySelectorAll(':scope > [data-start]');
+
+function previewTopLine() {
+  const top = preview.scrollTop;
+  if (top <= 0) return 0;
+  if (top + preview.clientHeight >= preview.scrollHeight - 2) return -1;
+  const y = top + PREVIEW_TOP;
+  for (const el of previewBlocks()) {
+    const t = el.offsetTop, b = t + el.offsetHeight;
+    if (b <= y) continue;
+    const s = +el.dataset.start, e = +el.dataset.end;
+    return s + 1 + (e - s) * Math.min(Math.max((y - t) / Math.max(1, b - t), 0), 0.999);
+  }
+  return -1;
+}
+
+function previewScrollTo(line) {
+  if (line < 0) { preview.scrollTop = preview.scrollHeight; return; }
+  if (line < 1) { preview.scrollTop = 0; return; }
+  const l = line - 1;
+  for (const el of previewBlocks()) {
+    const s = +el.dataset.start, e = +el.dataset.end;
+    if (l >= e) continue;
+    const f = l < s ? 0 : (l - s) / Math.max(1, e - s);
+    preview.scrollTop = el.offsetTop + f * el.offsetHeight - PREVIEW_TOP;
+    return;
+  }
+  preview.scrollTop = preview.scrollHeight;
+}
+
+// Editor (textové pole) neumí říct, kde je který řádek; odhaduje se podle podílu znaků.
+function editorTopLine() {
+  const max = editor.scrollHeight - editor.clientHeight;
+  if (editor.scrollTop <= 0) return 0;
+  if (editor.scrollTop >= max - 2) return -1;
+  const at = Math.round(editor.scrollTop / editor.scrollHeight * editor.value.length);
+  return editor.value.slice(0, at).split('\n').length;
+}
+
+function editorScrollTo(line) {
+  if (line < 0) { editor.scrollTop = editor.scrollHeight; return; }
+  if (line < 1) { editor.scrollTop = 0; return; }
+  const lines = editor.value.split('\n');
+  let at = 0;
+  for (let i = 0; i < Math.floor(line) - 1 && i < lines.length; i++) at += lines[i].length + 1;
+  editor.scrollTop = at / Math.max(1, editor.value.length) * editor.scrollHeight;
+}
+
+/// Řádek nahoře v okně, kterým se čte (náhled, nebo editor); null = nic otevřeného.
+function readingLine() {
+  if (!state.path) return null;
+  return effectiveMode() === 'preview' ? previewTopLine() : editorTopLine();
+}
+
+function applyPosition(line) {
+  posQuietUntil = Date.now() + 1000;
+  if (effectiveMode() === 'preview') previewScrollTo(line);
+  else { editorScrollTo(line); syncPreview(); }
+}
+
+let posScrollTimer = null;
+function recordPosition() {
+  clearTimeout(posScrollTimer);
+  posScrollTimer = setTimeout(() => {
+    const key = posKey();
+    if (!posReady || !key || Date.now() < posQuietUntil) return;
+    const line = Math.round(readingLine() * 10) / 10;
+    if (positions[key] && Math.abs(positions[key].line - line) < 0.5) return;
+    positions[key] = { line, at: Date.now() };
+    store.set('positions', positions);
+    clearTimeout(posTimer);
+    posTimer = setTimeout(pushPositions, 4000);
+  }, 300);
+}
+preview.addEventListener('scroll', recordPosition, { passive: true });
+editor.addEventListener('scroll', recordPosition, { passive: true });
+
+/// Načte pozice z GitHubu a otevřený soubor posune tam, kde se naposledy četlo (třeba na Macu).
+/// force = po otevření souboru (posunout vždy); jinak jen když se pozice mezitím změnila jinde.
+async function syncPosition(force) {
+  const key = posKey();
+  if (!key || !state.login) return;
+  if (force) posReady = false;
+  const before = positions[key];
+  try {
+    const file = await gh(posUrl());
+    posSha = file.sha;
+    const remote = JSON.parse(decodeBase64Utf8(file.content));
+    positions = mergePositions(positions, remote);
+    store.set('positions', positions);
+    // Co se minule nestihlo odeslat (aplikace se zavřela), pošle se teď.
+    if (!posTimer && Object.entries(positions).some(([k, v]) => !remote[k] || remote[k].at < v.at)) posTimer = setTimeout(pushPositions, 4000);
+  } catch (err) {
+    if (err instanceof GitHubError && err.status === 404) posSha = null;
+  }
+  if (key !== posKey()) return;   // mezitím otevřen jiný soubor
+  const pos = positions[key];
+  if (pos && (force || !before || pos.at !== before.at)) applyPosition(pos.line);
+  posReady = true;
+}
+
+async function pushPositions() {
+  posTimer = null;
+  if (!state.login) return;
+  const put = () => gh(posUrl(), {
+    method: 'PUT',
+    body: JSON.stringify({
+      message: 'Pozice čtení (iPhone)',
+      content: encodeUtf8Base64(JSON.stringify(positions, null, 2) + '\n'),
+      sha: posSha || undefined,
+    }),
+  });
+  try {
+    posSha = (await put()).content.sha;
+  } catch (err) {
+    if (!(err instanceof GitHubError) || (err.status !== 409 && err.status !== 422)) return;
+    try {
+      const file = await gh(posUrl());
+      posSha = file.sha;
+      positions = mergePositions(positions, JSON.parse(decodeBase64Utf8(file.content)));
+      posSha = (await put()).content.sha;
+    } catch { /* příště */ }
+  }
+}
 
 async function openPin(pin) {
   if (pin.repo !== state.repo) {
